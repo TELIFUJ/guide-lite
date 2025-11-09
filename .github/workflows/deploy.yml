@@ -1,0 +1,49 @@
+name: Build & Deploy (Lite)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 17 * * *"  # 台灣 01:00
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - run: pip install requests
+      - name: Build games_full.json
+        env:
+          EXT_API_BASE: ${{ secrets.EXT_API_BASE }}   # （可選）
+          EXT_API_KEY:  ${{ secrets.EXT_API_KEY }}    # （可選）
+        run: |
+          mkdir -p data/snapshots
+          python scripts/build_sources.py
+      - name: Commit data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/games_full.json
+          git commit -m "Lite data refresh" || echo "No changes"
+          git push
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: "." }
+      - uses: actions/deploy-pages@v4
