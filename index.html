@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Board Game Guide (Lite)</title>
+  <style>
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Arial;max-width:1000px;margin:24px auto;padding:0 12px}
+    header{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+    input,select{padding:8px;border:1px solid #ccc;border-radius:8px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+    .card{border:1px solid #e5e7eb;border-radius:12px;padding:12px}
+    .title{font-weight:700;margin:0 0 6px}
+    .meta{color:#6b7280;font-size:12px;margin-bottom:8px}
+    .pill{display:inline-block;border:1px solid #d1d5db;border-radius:999px;padding:2px 8px;font-size:12px;margin:2px}
+    .thumb{width:100%;height:160px;object-fit:cover;border-radius:8px;background:#f3f4f6}
+  </style>
+</head>
+<body>
+  <header>
+    <input id="q" placeholder="關鍵字（名稱/機制/分類）" />
+    <input id="pmin" type="number" min="1" step="1" placeholder="最少人數" style="width:110px" />
+    <input id="pmax" type="number" min="1" step="1" placeholder="最多人數" style="width:110px" />
+    <select id="sort">
+      <option value="hot">排序：熱門→名稱</option>
+      <option value="name">排序：名稱</option>
+      <option value="time">排序：時間（最短）</option>
+    </select>
+  </header>
+
+  <div id="count" class="meta"></div>
+  <div id="list" class="grid"></div>
+
+  <script>
+    let DATA = [];
+    const $ = (id) => document.getElementById(id);
+
+    async function load(){
+      const res = await fetch('data/games_full.json',{cache:'no-store'});
+      DATA = await res.json();
+      render();
+      ['q','pmin','pmax','sort'].forEach(id => $(id).addEventListener('input', render));
+    }
+
+    function pickImg(it){
+      return it.image || it.thumbnail || '';
+    }
+
+    function match(it){
+      const q = $('q').value.trim().toLowerCase();
+      const pmin = parseInt($('pmin').value || '0',10);
+      const pmax = parseInt($('pmax').value || '0',10);
+      if(q){
+        const hay = [it.name, it.mechanics, it.categories].join(' ').toLowerCase();
+        if(!hay.includes(q)) return false;
+      }
+      if(pmin && (it.max_players||0) < pmin) return false;
+      if(pmax && (it.min_players||0) > pmax) return false;
+      return true;
+    }
+
+    function render(){
+      let arr = DATA.filter(match);
+      const sort = $('sort').value;
+      if(sort === 'hot'){
+        arr.sort((a,b)=> (b.hot_flag||0)-(a.hot_flag||0) || String(a.name).localeCompare(String(b.name)));
+      }else if(sort === 'name'){
+        arr.sort((a,b)=> String(a.name).localeCompare(String(b.name)));
+      }else if(sort === 'time'){
+        arr.sort((a,b)=> (a.min_playtime||0)-(b.min_playtime||0));
+      }
+      $('count').textContent = `顯示：${arr.length} / 總計 ${DATA.length}`;
+      $('list').innerHTML = arr.map(it=>{
+        const img = pickImg(it);
+        const mech = (it.mechanics || '').split(';').filter(Boolean).slice(0,4);
+        const cats = (it.categories || '').split(';').filter(Boolean).slice(0,3);
+        return `
+          <div class="card">
+            ${img ? `<img class="thumb" src="${img}" alt="${it.name}">` : ``}
+            <h3 class="title">${it.name||''} ${it.year_published?`(${it.year_published})`:''}</h3>
+            <div class="meta">
+              玩家：${it.min_players||'?'}–${it.max_players||'?'}
+              ｜時間：${it.min_playtime||'?'}–${it.max_playtime||'?'} 分
+              ｜BGG#${it.bgg_id||''}
+            </div>
+            <div>${mech.map(x=>`<span class="pill">${x}</span>`).join('')}</div>
+            <div>${cats.map(x=>`<span class="pill">${x}</span>`).join('')}</div>
+          </div>`;
+      }).join('');
+    }
+
+    load();
+  </script>
+</body>
+</html>
