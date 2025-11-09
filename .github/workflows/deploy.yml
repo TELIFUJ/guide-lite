@@ -26,7 +26,7 @@ jobs:
 
       - run: pip install requests
 
-      # 確保套件初始化檔存在（若未提交到 repo，也能臨時建立）
+      # 保險：若你還沒把 __init__.py 提交，流程會臨時建立
       - name: Ensure package inits
         run: |
           mkdir -p scripts/providers
@@ -52,10 +52,23 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+
+      # 關鍵：若尚未啟用 Pages，自動建立並設定為以 Actions 部署
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
         with:
           path: "."
-      - uses: actions/deploy-pages@v4
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
