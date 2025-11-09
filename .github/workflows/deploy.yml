@@ -19,22 +19,33 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
+
       - run: pip install requests
+
+      # 確保套件初始化檔存在（若未提交到 repo，也能臨時建立）
+      - name: Ensure package inits
+        run: |
+          mkdir -p scripts/providers
+          touch scripts/__init__.py scripts/providers/__init__.py
+
       - name: Build games_full.json
         env:
+          PYTHONPATH: ${{ github.workspace }}
           EXT_API_BASE: ${{ secrets.EXT_API_BASE }}   # （可選）
           EXT_API_KEY:  ${{ secrets.EXT_API_KEY }}    # （可選）
         run: |
           mkdir -p data/snapshots
-          python scripts/build_sources.py
+          python -m scripts.build_sources
+
       - name: Commit data
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/games_full.json
+          git add data/games_full.json scripts/__init__.py scripts/providers/__init__.py || true
           git commit -m "Lite data refresh" || echo "No changes"
           git push
 
@@ -45,5 +56,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
-        with: { path: "." }
+        with:
+          path: "."
       - uses: actions/deploy-pages@v4
